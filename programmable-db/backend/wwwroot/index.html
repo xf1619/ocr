@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Programmable DB MVP</title>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 24px; }
+    .row { margin-bottom: 8px; }
+    input, button, textarea { padding: 8px; margin-right: 8px; }
+    textarea { width: 700px; height: 100px; }
+    pre { background: #f6f8fa; padding: 12px; overflow: auto; }
+  </style>
+</head>
+<body>
+<div id="app">
+  <h1>Programmable DB - MVP 控制台</h1>
+
+  <h2>连接管理</h2>
+  <div class="row">
+    <input v-model="create.name" placeholder="名称" />
+    <input v-model="create.provider" placeholder="provider (sqlite/mysql/sqlserver/postgres)" />
+    <input v-model="create.connectionString" placeholder="连接串" style="width: 420px;" />
+    <button @click="createSource">创建</button>
+  </div>
+  <button @click="loadSources">刷新连接列表</button>
+  <pre>{{ sources }}</pre>
+
+  <h2>受限 SQL 查询（只允许 SELECT）</h2>
+  <div class="row">
+    <input v-model="query.datasource" placeholder="datasource id" style="width: 280px;" />
+  </div>
+  <div class="row">
+    <textarea v-model="query.sql" placeholder="SELECT * FROM your_table LIMIT 10"></textarea>
+  </div>
+  <button @click="runQuery">执行查询</button>
+  <pre>{{ queryResult }}</pre>
+</div>
+
+<script>
+const { createApp } = Vue;
+createApp({
+  data() {
+    return {
+      create: {
+        name: 'Local SQLite',
+        provider: 'sqlite',
+        connectionString: 'Data Source=app-data.db'
+      },
+      sources: [],
+      query: { datasource: 'default-sqlite', sql: 'SELECT 1 as ok' },
+      queryResult: null
+    }
+  },
+  mounted() { this.loadSources(); },
+  methods: {
+    async loadSources() {
+      const resp = await fetch('/api/admin/datasources');
+      this.sources = await resp.json();
+    },
+    async createSource() {
+      await fetch('/api/admin/datasources', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(this.create)
+      });
+      await this.loadSources();
+    },
+    async runQuery() {
+      const resp = await fetch(`/api/query/${this.query.datasource}/sql`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sql: this.query.sql, parameters: {} })
+      });
+      this.queryResult = await resp.json();
+    }
+  }
+}).mount('#app');
+</script>
+</body>
+</html>
